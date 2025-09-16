@@ -1,0 +1,5 @@
+argparse
+transformers==4.53.3
+sentence_transformers
+torch
+tqdm
