@@ -41,6 +41,7 @@ print("Embedded corpus...")
 
 queries = []
 results = []
+classes = []
 with open(parser.input_query_json, "r", newline='') as f:
     json_reader = json.load(f)
     for i in range(1,4310):
@@ -48,6 +49,7 @@ with open(parser.input_query_json, "r", newline='') as f:
             continue
         queries.append(json_reader[str(i)]["OriginalQuery"])
         results.append("; ".join(json_reader[str(i)]["APIs"]))
+        classes.append("; ".join(json_reader[str(i)]["APIClasses"]))
 
 all_res = []
 query_embeddings = embedder.encode(queries, convert_to_tensor=True, show_progress_bar=True,batch_size=512)
@@ -60,7 +62,7 @@ for i, (query,query_embedding) in enumerate(zip(queries, query_embeddings)):
     hits = util.semantic_search(query_embedding, corpus_embeddings, top_k=int(parser.top_k))
     hits = hits[0]      
     
-    res = {"id":i, "Instruction":query, "Results":results[i]}
+    res = {"id":i, "Instruction":query, "Results":results[i], "APIClasses":classes[i]}
     
     for j, hit in enumerate(hits):
         col_name = "rank_" + str(j)
@@ -69,7 +71,7 @@ for i, (query,query_embedding) in enumerate(zip(queries, query_embeddings)):
 
 print("Performed semantic search...")
 
-fieldname = ["id","Instruction","Results"]
+fieldname = ["id","Instruction","Results","APIClasses"]
 for i, hit in enumerate(hits):
     col_name = "rank_" + str(i)
     fieldname.append(col_name)

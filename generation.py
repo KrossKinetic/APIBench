@@ -11,12 +11,12 @@ Usage:
     --csv output.csv \
     --out other_output.csv \
     --server http://localhost:8000 \
-    --model Qwen/Qwen2.5-Omni-3B \
+    --model Qwen/Qwen2.5-Coder-1.5B-Instruct \
     --max-tokens 512 \
     --temperature 0.2 \
     --seed 42
 
-CUDA_VISIBLE_DEVICES=0 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-Omni-3B --port 8000 --max-model-len 4096 --gpu-memory-utilization 0.90 --trust-remote-code
+CUDA_VISIBLE_DEVICES=0 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-Omni-3B --port 8000 --max-model-len 4096 --gpu-memory-utilization 0.80 --trust-remote-code
 Used this to run server
 """
 
@@ -42,23 +42,24 @@ def _normalize_ctx(x) -> str:
     return s
 
 
-def build_prompt(instruction: str, contexts: list[str]) -> str:
+def build_prompt(instruction: str, contexts: list[str], classes:str) -> str:
     # Label and join context docs (skip empties)
     ctx_labeled = [c.strip() for c in contexts if str(c).strip()]
     context_block = "\n".join(ctx_labeled)
 
     return (f"""
         You are an expert Python API recommendation system.  
-        Given the OriginalQuery and the provided context, predict the most relevant Python APIs.  
+        Given the OriginalQuery and the provided context + class of the API to use, predict the most relevant Python APIs from that class.  
 
         Requirements:  
         - Output only API names as a JSON array.  
-        - No explanations or extra text.  
-        - Format strictly as: ["api1()", "api2()", ...]  
+        - No explanations or extra text. Only the complete API with class is needed. No parameter should be added inside APIs.
+        - Format of API names should be: className.apiName
         - Wrap the output in a ```json``` code block.  
 
-        OriginalQuery: {instruction}
-        Context: {context_block}
+        OriginalQuery: {instruction}\n
+        Classes: {classes}\n
+        Context: {context_block}\n
         """
     )
 
@@ -98,7 +99,7 @@ def call_vllm_completions_openai(
                 max_tokens=max_tokens,
                 seed=seed,   # vLLM supports seed for determinism
                 n=1,
-                stop=stop,
+                stop=["``` ```"],
             )
             return resp.choices[0].text
         except (APIError, APITimeoutError, RateLimitError, Exception) as e:
@@ -110,7 +111,7 @@ def call_vllm_completions_openai(
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--csv", required=True, help="Input CSV with Autocompletion, Instruction, rank_0..rank_9")
+    ap.add_argument("--csv", required=True, help="Input CSV with Instruction, rank_0..rank_9")
     ap.add_argument("--out", required=True, help="Output CSV with ModelResponse column")
     ap.add_argument("--server", default="http://localhost:8000", help="vLLM base URL")
     ap.add_argument("--model", default="codellama/CodeLlama-7b-Instruct-hf")
@@ -126,11 +127,6 @@ def main():
     args = ap.parse_args()
 
     df = pd.read_csv(args.csv)
-
-    # Validate core columns
-    for col in ("Instruction"):
-        if col not in df.columns:
-            raise ValueError(f"Missing required column '{col}' in {args.csv}")
 
     # It’s okay if some ranks are missing; we’ll treat them as empty strings.
     rank_cols = [f"rank_{i}" for i in range(10)]
@@ -152,6 +148,7 @@ def main():
         contexts = [_normalize_ctx(row.get(f"rank_{i}", "")) for i in range(10)]
         prompt = build_prompt(
             instruction=_normalize_ctx(row["Instruction"]),
+            classes = row["APIClasses"],
             contexts=contexts,
         )
         prompts.append(prompt)
@@ -163,7 +160,7 @@ def main():
                     top_p=args.top_p,
                     max_tokens=args.max_tokens,
                     seed=args.seed,
-                    stop=stop,
+                    stop=None,
                     api_key=args.api_key)
             
     with multiprocessing.Pool(processes=8) as pool:
@@ -175,7 +172,7 @@ def main():
 
     out_df = df.copy()
     out_df["ModelResponse"] = outputs
-    out_df = out_df[['Instruction', 'Test','ModelResponse']]
+    out_df = out_df[['Instruction','Results','ModelResponse']]
     out_df.to_csv(args.out, index=False)
     print(f"Wrote results to {args.out}")
 

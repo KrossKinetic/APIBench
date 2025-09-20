@@ -1,0 +1,70 @@
+Instruction,Results,ModelResponse
+"How to generate a ""big"" random number in Python?",random.randrange()," ```json
+[""random.randint""]
+"
+"Storing big numbers over 9,000 digits in Python",sys.getsizeof()," ```json
+[""sys.setrecursionlimit""]
+"
+Python: Calculate factorial of a non-integral number,math.gamma()," ```json
+[""math.factorial""]
+"
+How to get first AND last element of tuple at the same time,operator.itemgetter()," ```json
+[""operator.itemgetter(0)"", ""operator.itemgetter(-1)""]
+"
+PYTHON : Simple random generation driving if/else,numpy.random.randint()," ```json
+[""numpy.random.randint""]
+"
+Python: formatting dictionary having tuple as keys,getattr()," ```json
+[""collections.defaultdict""]
+"
+Call and receive output from Python script in Java?,exec()," ```json
+[""java.lang.Runtime.exec""]
+"
+Reading UTF-8 file with codecs in IronPython,next()," ```json
+[
+    ""IronPython.Codecs.Codecs.Open""
+]
+"
+Call Python From Bat File And Get Return Code,sys.exit()," ```json
+[""sys.exit""]
+"
+Forming an insert statement with single quotes in Python with Postgres,msilib.View.Execute()," ```json
+[""msilib.View.insert""]
+"
+Python regex for Python function signatures,str.split()," ```json
+[""str.match""]
+"
+"Find ""home directory"" in Python?",os.path.expanduser()," ```json
+[""os.path.expanduser""]
+"
+How can I log the package name in Python?,inspect.stack()," ```json
+[""inspect.getmodule""]
+"
+How to get process PID for manual lock mechanism in Python?,os.getpid()," ```json
+[""os.getpid""]
+"
+How to save to file a dictionary with utf-8 strings correctly,codecs.open()," ```json
+[""codecs.open""]
+"
+How to perform element-wise multiplication of two lists?,zip()," ```json
+[""numpy.multiply""]
+"
+Python: loop though list calling functions in namespace,getattr()," ```json
+[""collections.defaultdict""]
+"
+Dump stacktraces of all active Threads,sys._current_frames()," ```json
+[
+    ""sys.gettraceback""
+]
+"
+Read XML file which has xmlns in tag with python,xml.etree.ElementTree.register_namespace()," ```json
+[
+    ""xml.etree.ElementTree.parse""
+]
+"
+A fast way to find the largest N elements in an numpy array,numpy.partition()," ```json
+[""numpy.argpartition""]
+"
+converting list of string to list of integer,map()," ```json
+[""list.map""]
+"
