@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Reads a CSV with columns including:
-  ['id', 'Instruction', 'Autocompletion', 'Test', 'Output', 'rank_0', ..., 'rank_9']
+  ['id', 'Instruction', 'Results', 'rank_0', ..., 'rank_9']
 
 Sends prompts to a vLLM OpenAI-compatible server via /v1/completions
 (using the OpenAI SDK), and writes a results CSV including ModelResponse.
@@ -11,12 +11,12 @@ Usage:
     --csv output.csv \
     --out other_output.csv \
     --server http://localhost:8000 \
-    --model unsloth/codellama-7b \
+    --model Qwen/Qwen2.5-Omni-3B \
     --max-tokens 512 \
     --temperature 0.2 \
     --seed 42
 
-CUDA_VISIBLE_DEVICES=0 python -m vllm.entrypoints.openai.api_server --model unsloth/codellama-7b --port 8000 --max-model-len 4096 --gpu-memory-utilization 0.90 --trust-remote-code
+CUDA_VISIBLE_DEVICES=0 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-Omni-3B --port 8000 --max-model-len 4096 --gpu-memory-utilization 0.90 --trust-remote-code
 Used this to run server
 """
 
@@ -42,19 +42,24 @@ def _normalize_ctx(x) -> str:
     return s
 
 
-def build_prompt(instruction: str, autocompletion: str, contexts: list[str]) -> str:
+def build_prompt(instruction: str, contexts: list[str]) -> str:
     # Label and join context docs (skip empties)
     ctx_labeled = [c.strip() for c in contexts if str(c).strip()]
     context_block = "\n".join(ctx_labeled)
 
-    return (
-        "You are an expert Python coding assistant.\n"
-        "Complete the code to satisfy the instruction. "
-        "Return ONLY valid Python code inside ```Python code block. Do not add explanations or comments.\n\n"
-        "Here are some retrieved documents that may be helpful:\n"
-        f"Context: {context_block}\n\n"
-        f"Instruction: \n{instruction}\n"
-        f"{autocompletion}\n"
+    return (f"""
+        You are an expert Python API recommendation system.  
+        Given the OriginalQuery and the provided context, predict the most relevant Python APIs.  
+
+        Requirements:  
+        - Output only API names as a JSON array.  
+        - No explanations or extra text.  
+        - Format strictly as: ["api1()", "api2()", ...]  
+        - Wrap the output in a ```json``` code block.  
+
+        OriginalQuery: {instruction}
+        Context: {context_block}
+        """
     )
 
 
@@ -123,7 +128,7 @@ def main():
     df = pd.read_csv(args.csv)
 
     # Validate core columns
-    for col in ("Autocompletion", "Instruction"):
+    for col in ("Instruction"):
         if col not in df.columns:
             raise ValueError(f"Missing required column '{col}' in {args.csv}")
 
@@ -147,7 +152,6 @@ def main():
         contexts = [_normalize_ctx(row.get(f"rank_{i}", "")) for i in range(10)]
         prompt = build_prompt(
             instruction=_normalize_ctx(row["Instruction"]),
-            autocompletion=_normalize_ctx(row["Autocompletion"]),
             contexts=contexts,
         )
         prompts.append(prompt)

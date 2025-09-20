@@ -39472,7 +39472,7 @@
     },
     "4307": {
         "APIs": [
-            "\u201csorted()"
+            "sorted()"
         ],
         "APIClasses": [],
         "OriginalQuery": "Ways to sort list of dictionaries by values in Python \u2013 Using lambda function",
