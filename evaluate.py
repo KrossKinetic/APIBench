@@ -2,8 +2,11 @@ import csv
 import json
 import re
 from typing import List, Optional
+import os
+from openai import OpenAI
+import argparse
 
-API_TOKEN_RE = re.compile(r'\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+\b')  # matches dotted names like pkg.mod.func
+API_TOKEN_RE = re.compile(r'\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+\b')
 
 def normalize_api(s: str) -> str:
     if s is None:
@@ -26,7 +29,7 @@ def parse_expected_list(results_field: str) -> List[str]:
     if results_field is None:
         return []
     rf = results_field.strip()
-    # Try JSON first
+    
     try:
         parsed = json.loads(rf)
         if isinstance(parsed, list):
@@ -34,7 +37,6 @@ def parse_expected_list(results_field: str) -> List[str]:
     except Exception:
         pass
 
-    # If not JSON, split on semicolon or comma (but keep things like "pkg.func, other" robust)
     parts = re.split(r'[;,]\s*', rf)
     parts = [normalize_api(p) for p in parts if p and p.strip()]
     return parts
@@ -97,14 +99,14 @@ def evaluate_api_hits(csv_file: str):
 
     with open(csv_file, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
-        headers = {h.lower(): h for h in reader.fieldnames}
-        results_col = headers.get("results", "Results")
-        response_col = headers.get("modelresponse", "ModelResponse")
+        row_count = 0
 
         for row in reader:
             row_count += 1
-            expected_raw = row.get(results_col, "") or ""
-            response_raw = row.get(response_col, "") or ""
+
+            expected_raw = row["Results"]
+            response_raw = row["ModelResponse"]
+            query = row["Instruction"]
 
             expected_list = parse_expected_list(expected_raw)
             predicted_list = extract_predicted_from_text(response_raw)
@@ -120,9 +122,49 @@ def evaluate_api_hits(csv_file: str):
                         break
                 if matched:
                     matched_apis += 1
+                else:
+                    if LLM_match("; ".join(predicted_list),api,query):
+                        matched_apis += 1
 
     print(f"\nMatched APIs: {matched_apis}/{total_apis}")
     print(f"Accuracy: {matched_apis / total_apis:.2%}")
 
+def LLM_match(predicted_list_str: str, api: str, query: str) -> bool:
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+    prompt = f"""
+    You are evaluating API recommendation results.
+
+    Query: {query}
+
+    Ground truth API (may be noisy or ambiguous): {api}
+
+    Model predicted APIs: {predicted_list_str}
+
+    Task: Decide if the model's predicted APIs provide a correct and reasonable solution to the query, 
+    even if the ground truth is wrong. Return only a single word:
+    True  → if correct
+    False → if not correct
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        max_tokens=3
+    )
+
+    try:
+        result = response.choices[0].message.content.strip()
+        return result.lower().startswith("true")
+    except Exception:
+        return False
+
+
 if __name__ == "__main__":
-    evaluate_api_hits("other_output.csv")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_csv", nargs="?", default="other_output.csv", help="Path to input CSV file with results to evaluate")
+    args = parser.parse_args()
+
+    evaluate_api_hits(args.input_csv)
+
